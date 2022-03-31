@@ -1,4 +1,4 @@
-name: "Yay internet!"
+name: "Website of Tsz Fung Wong"
 header-includes: 
   \usepackage{graphicx}
   \usepackage{float}
