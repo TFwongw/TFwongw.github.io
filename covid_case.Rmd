@@ -1,0 +1,197 @@
+---
+title: "Covid_Case"
+author: Tsz Fung Wong
+date: March 30, 2022
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(DataExplorer)
+library(ggplot2)
+library(gt)
+library(lubridate)
+library(plotly)
+library(flexdashboard)
+
+#Working directory for .RMD
+knitr::opts_knit$set(echo = TRUE,
+root.dir = rprojroot::find_rstudio_root_file())
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+# fig.height = 4
+fig.width = 6,
+# fig.asp = .5,
+out.width = "90%",
+# out.height =
+fig.align = "center",
+cache = FALSE,
+echo = TRUE
+)
+#Set Theme for ggplot2
+theme_set(theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+#Set Scientific notation output for knitr
+options(scipen = 999)
+options(digits = 4)
+```
+
+```{r data_read, message = FALSE, warning = FALSE, echo=FALSE}
+file_dir = "./data/"
+covid_file_list = intersect( 
+                  list.files(file_dir, pattern = c("covid")),
+                  list.files(file_dir, pattern = c(".csv"))
+                  )
+
+covid_file_list = covid_file_list[!str_detect(covid_file_list, "aggregate")]
+
+#read all files with names include continent 
+covid_aggr = tibble(file_dir   = "./data/", #path for read csv
+          file_list  = covid_file_list, #list of filename for read csv
+          data_name  = str_split(file_list, "_", 2) %>% #extract continent information 
+            map_chr(2), 
+          file_paths = str_c(file_dir, file_list) # full filepath
+          ) %>%
+  mutate(
+    data = map(.x = file_paths, ~read_csv(.x)),
+    continent = str_remove(data_name, ".csv")
+  ) %>%
+  dplyr::select(!contains(c("file", "name"))) %>% #retain only data
+  unnest(data) %>%
+  janitor::clean_names() 
+  
+#cleaning variables
+covid_aggr = covid_aggr %>%
+  mutate(
+    date = ymd(date),
+    continent = as.factor(continent), 
+    country = as.factor(location),
+    case_0 = if_else(is.na(new_cases), 0, new_cases), #NA = 0 temporarily for cumsum
+    death_0 = if_else(is.na(new_deaths), 0, new_deaths),
+    month = month(date, label = TRUE, abbr = TRUE),
+    dow = wday(date, 
+               label = TRUE, 
+               abbr = FALSE, 
+               week_start = getOption("lubridate.week.start", 1)) #start from Monday
+    ) %>%
+  select(-location) %>%
+  nest(-country) %>%
+  mutate(case_tot = map_dbl(.x = data,
+                            ~max(cumsum(.x$case_0))),
+         death_tot = map_dbl(.x = data,
+                             ~max(cumsum(.x$death_0))), #sum over case and death number per country
+         ) %>%
+  unnest(data) %>%
+  select(-c(case_0, death_0)) #remove variables for calculating case_tot and death_tot
+
+```
+ 
+
+Column {data-width=150}
+-----------------------------------------------------------------------
+
+### Distribution of Death Cases in Day of Week
+
+```{r message = FALSE, warning = FALSE, echo=FALSE}
+covid_aggr %>% 
+   plot_ly(
+    y      = ~log(new_deaths),
+    color  = ~dow,
+    type   = "box",
+    colors = "viridis" 
+  ) %>%
+  layout(
+    title  = "Boxplot of Death Cases in Day of Week",
+    xaxis  = list(title = "Day of Week")
+  )
+ 
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Global Trend of New Case
+
+```{r message = FALSE, warning = FALSE，echo=FALSE}
+covid_trend.df = covid_aggr %>%
+  nest(-date) %>%
+  mutate(
+    Summary = map(.x = data, #summary statistics across case/ death
+                         ~.x %>%
+                           mutate(
+                             across(c(new_cases, new_deaths, new_cases_smoothed, new_deaths_smoothed),
+                                    .f = list(sum = sum),
+                                    na.rm = TRUE,
+                                    .names = "{.col}_{.fn}"
+                                    )
+                             )
+                  )
+    ) %>%
+  unnest() %>%
+  select(c(date, contains("sum"))) %>% #extract relevant columns
+  distinct() %>%
+  rename(Date = date, 
+         Cases = new_cases_sum,
+         Deaths = new_deaths_sum)
+
+
+case.gg = covid_trend.df %>% #plot for covid case
+  ggplot(aes(x = Date, color = Cases)) +
+  geom_col(
+    aes(y = Cases),
+    alpha = 0.02)  +
+  geom_smooth(
+    aes(y = new_cases_smoothed_sum, fill = ""),
+    alpha = 0.8,
+    span = 0.05) +
+  guides(fill = guide_legend(title = "7-day Average")) + #legend
+  labs(
+    x = "Date (Month,Year)",
+    title = "Global Trend of Covid-19 Cases") +
+  scale_x_date( 
+    date_breaks = "3 month",  
+    date_labels = "%b %y" 
+    ) +
+   theme(axis.text.x = element_text(angle = 45,
+                                    vjust = 1.24,
+                                    hjust = 1.2,
+                                    size  = 10),
+          axis.text.y = element_text(size  = 10)) +
+  scale_y_continuous(labels = scales::label_number_si()) #y-axis in M
+
+ggplotly(case.gg)
+
+```
+
+### Global Trend of New Death 
+
+```{r, echo=FALSE}
+death.gg = covid_trend.df %>% #plot for Covid death
+  ggplot(aes(x = Date, color = Deaths)) +
+  geom_col(
+    aes(y = Deaths),
+    alpha = 0.02) + 
+  geom_smooth(
+    aes(y = new_deaths_smoothed_sum, fill = ""),
+    alpha = 0.8,
+    span = 0.05) +
+  guides(fill = guide_legend(title = "7-day Average")) + #legend
+  labs(
+    x = "Date (Month,Year)",
+    title = "Global Trend of Covid-19 Deaths") +
+  scale_x_date( 
+    date_breaks = "3 month",  
+    date_labels = "%b %y" 
+    ) +
+   theme(axis.text.x = element_text(angle = 45,
+                                    vjust = 1.24,
+                                    hjust = 1.2,
+                                    size  = 10),
+          axis.text.y = element_text(size  = 10)) +
+  scale_y_continuous(labels = scales::label_number_si()) #y-axis in M 
+
+ggplotly(death.gg)
+```

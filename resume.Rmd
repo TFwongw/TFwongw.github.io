@@ -1,0 +1,62 @@
+---
+title: "Resume"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+<font size = "4">
+
+# Education
+## The Chinese University of Hong Kong (CUHK)  
+### BSc in Risk Management Science, Minor in Biology and Statistics (2017- 2021)
+Relevant Modules: Investment and Portfolio Analysis, Regression Analysis, Categorical Data Analysis,
+Stochastic Process, Random Number Generation, Statistical Inference, Ecology, Evolutionary Biology
+
+## University of Minnesota(UMN)
+### MS in Bioinformatics and Computational Biology(2021-2023)
+Relevant Modules: Computational biology, System biology, data analysis, machine learning
+
+# Professional and Employment History
+## Analysis of wage data in R(2020)
+• Generated descriptive statistics and identified multicollinearity among predictors
+
+• Compared the model fitting performance of multiple GLMs and identified the logistic model as the best
+
+• Performed AIC model selection and identified sex, experience and occupation as significant factors of
+wage
+
+• Visualize probability and odd ratios change with explanatory variables
+
+## Machine Learning Project
+• Use Naïve Bayes to analyze news sentiment
+
+• Perform stock price prediction using recurrent neural network and reinforcement learning
+
+## System Biology Simulation 
+• Stability analysis of E.coil consortium population 
+
+## Data Visualization With R
+• Use of ggplot, gt packages and interactive graphics with Shiny
+
+• Visualization project on US trading dataset from 2000 to 2020
+
+# Internship 
+## Cushman & Wakefield(Shanghai)
+Intern, Project and Development Service(2019)
+• Cooperated smoothly with colleagues of various nationalities and backgrounds in China Universal
+Office development projects
+
+• Analyzed the collected data and venders’ backgrounds, recommended competitive venders after
+weighing abilities, qualities and timing of deliveries of services
+
+</font>
+
+
+
+
+
+
+
+

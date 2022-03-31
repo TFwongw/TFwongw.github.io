@@ -1,0 +1,23 @@
+---
+title: "Tsz Fung Wong"
+---
+
+<div style= "float : left; position : relative; top: 0px; width : 450px; height : 360px; padding-right: 24px; margin-bottom : 0px">
+![Tsz Fung Wong](./photo/TFwong.jpg)
+
+</div>
+
+<font size = "4"> 
+*I am a first year Computational Biology MS student in the University of Minnesota. My research interests lies in system biology and stability analysis of biological networks.*
+</font>  
+
+  
+<font size = "4">
+*Although life itself  is constitute of basic building blocks, the interactions between those elements, give rise to extremely complex systems. Enables life to exist, adapt, and evolve. All, for the ultimate goal, survival.*
+</font>
+
+<font size = "3">
+"One general law, leading to the advancement of all organic beings, namely, multiply, vary, let the strongest live and the weakest die.”    —— Charles Darwin, The Origin of Species  
+</font>
+
+

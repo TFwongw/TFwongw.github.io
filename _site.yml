@@ -1,0 +1,25 @@
+name: "Yay internet!"
+header-includes: 
+  \usepackage{graphicx}
+  \usepackage{float}
+output_dir: "."
+navbar:
+  title: "Home"
+  right:
+    - text: "Profession Documents"
+      menu:
+        - text: "Resume"
+          href: resume.html
+    - text: "Recent Work"
+      menu:
+        - text: "Covid Visualization 2019-2022"
+          href: covid_case.html
+    - icon: fa-envelope fa-lg
+      href: mailto:<wong0755@umn.edu>
+    - icon: fa-github fa-lg
+      href: http://github.com/TFwongw/ 
+    - icon: fa-rocket fa-lg
+      href: https://www.linkedin.com/
+output:  
+   html_document:
+    theme: flatly
