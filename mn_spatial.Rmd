@@ -1,0 +1,303 @@
+---
+title: "Minnesota Hennepin County (ACS) Esimate"
+author: Tsz Fung Wong
+date: April 14, 2022
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include = FALSE, echo = FALSE}
+#Load the good stuff
+library(tidyverse)
+library(lubridate)
+library(gt)
+library(paletteer)
+library(ggridges)
+library(plotly)
+library(gtExtras)
+library(sf)
+library(ggmap)
+library(tidycensus)
+library(leaflet)
+library(osmdata)
+library(tigris)
+library(ggthemes)
+library(viridis)
+library(htmltools)
+
+
+#Working directory for .RMD
+knitr::opts_knit$set(echo = TRUE,
+                     root.dir = rprojroot::find_rstudio_root_file())
+
+#Controlling figure output in markdown
+knitr::opts_chunk$set(
+#  fig.height =   
+  fig.width = 6,
+#  fig.asp = .5,
+  out.width = "90%",
+#  out.height = 
+ fig.align  = "center",
+  cache = TRUE,
+  eval  = TRUE,
+  echo  = TRUE,
+  warning = FALSE
+)
+
+#My Colours (from viridis)
+my_purple <- "#440154FF"
+my_yellow <- "#FDE725FF"
+
+#Set Theme for ggplot2
+theme_set(theme_bw() + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom"))
+
+#Set Scientific notation output and decimal places for knitr
+options(scipen = 999)
+options(digits = 4)
+options(dplyr.summarise.inform = FALSE)
+```
+
+Column {data-width=150}
+-----------------------------------------------------------------------
+
+### Hennepin County Birth Statistic
+
+
+```{r mn_read, message = FALSE, warning = FALSE，echo=FALSE, include = FALSE}
+#Read in the shape file (don't make a tibble)
+mn.df <- st_read("./data/USA_Counties/USA_Counties.shp", quiet = TRUE) %>%
+  janitor::clean_names() %>%
+  filter(state_name %in% "Minnesota")
+
+mn_birth.df <- get_acs(
+  geography = "tract",
+  variables = "B19013_001", #Code for birth
+  state     = "MN",
+  county    = "Hennepin",
+  year      = 2020,
+  geometry  = TRUE
+)
+```
+
+
+
+```{r ggmap_base, message = FALSE, warning = FALSE，echo=FALSE，include=FALSE}
+#Get the bounding box and county outline
+mn.box           <- osmdata::getbb("minnesota")
+hennepin.box     <- osmdata::getbb("hennepin")
+hennepin.outline <- osmdata::getbb("hennepin", format_out = "polygon")[[1]] %>%
+  as_tibble() %>%
+  rename(longitude = V1, latitude = V2)
+
+
+#Get map from ggmap
+#Get the base map (foundational layer)
+mn_base.map <- get_map(
+                location = hennepin.box,
+                source   = "google",
+                maptype  = "roadmap",
+                crop = TRUE
+               )
+
+#Create the base map
+hennepin_base.gg <- ggmap(mn_base.map) +
+  geom_polygon(data = hennepin.outline, aes(x = longitude, y = latitude), colour = "black", size = 1.6, alpha = 0.1) +
+  theme_map() +
+  theme(
+    plot.title   = element_text(size  = 16,
+                                hjust = 0.5),
+    legend.text  = element_text(size = 16),
+    legend.title = element_text(size = 16),
+    legend.position = "right"
+  )
+     
+```
+
+
+
+```{r tidy_census, message = FALSE, warning = FALSE，echo=FALSE}
+#Save the cache so you don't need to call the same API request over and over
+options(tigris_use_cache = TRUE)
+
+#Call the ACS API, returns a sf object
+mn_birth.df <- get_acs(
+  geography = "tract",
+  variables = "B13002_001E", #Code for birth
+  state     = "MN",
+  county    = "Hennepin",
+  year      = 2020,
+  geometry  = TRUE
+)
+```
+
+```{r mn_birth, message = FALSE, warning = FALSE，echo=FALSE}
+#Add a text label to mn_birth.df
+mn_birth_plotly.df <- mn_birth.df %>%
+  mutate(
+    tract      = str_split(NAME, ",") %>%
+                 map_chr(1) %>%
+                 str_remove("Census Tract "),
+    text_label = str_c(
+                  "Tract: ",
+                  tract,
+                  "\nWomen given birth: ",
+                  estimate
+                 )
+  )
+
+#Generate the ggplot
+birth.gg <- ggplot() + 
+  geom_sf(data = mn_birth_plotly.df, 
+          aes(fill = estimate, text = text_label),
+          colour = "black", size = 0.1) + 
+  labs(title = "Hennepin County, MN 2020 ACS \nMother Given Births in 12 months") + 
+  scale_fill_viridis_c("Number of Women \nGiven Birth Last Year") +
+  theme_map() +
+  theme(
+    plot.title   = element_text(size  = 16,
+                                hjust = 0.5),
+    legend.text  = element_text(size = 16),
+    legend.title = element_text(size = 16),
+    legend.position = "right"
+  )
+
+
+#Display
+ggplotly(birth.gg,
+         tooltip = "text",
+         height  = 400,
+         width   = 600) %>%
+    style(hoveron = "fills")
+```
+
+
+
+Column {data-width=150}
+-----------------------------------------------------------------------
+
+### Hennepin County, MN OSM Features -- Office Distribution 
+
+```{r message = FALSE, warning = FALSE，echo=FALSE}
+#office locations
+osm_office_sf.df <- opq(bbox = "hennepin", timeout = 50) %>%
+  add_osm_feature(key = "office", value = c("government","company","estate_agent")) %>%
+  osmdata_sf()
+
+
+#Extract the relevent sf data frame
+office_points.df <- osm_office_sf.df$osm_points %>% 
+  janitor::clean_names() %>%
+  filter(!is.na(office)) %>% #only retain 'valid' tags
+  dplyr::select(osm_id, name, office, opening_hours, phone, website, geometry) %>%
+  mutate(office =  str_replace(office, "_"," ") %>%
+           str_to_title() %>% 
+           as.factor())
+```
+
+```{r message = FALSE, warning = FALSE，echo=FALSE}
+#Extract the levels/order of office type factor
+office_types <- levels(office_points.df$office)
+n_types    <- length(office_types)
+
+#Initialize our colour pallete (discrete in this case)
+my_pallete <- colorFactor(viridis_pal(option = "D")(n_types), domain = office_types)
+
+#Add a text label 
+office_label.df <- office_points.df %>%
+  mutate(
+    text_label = str_c(
+                   name,
+                   "<br/>Office Type: ",
+                   office,
+                   "<br/>Open Hours: ",
+                   opening_hours,
+                   "<br/>Phone: ",
+                   phone,
+                   "<br/>Website: ",
+                   website
+                 )
+  )
+
+leaflet(data = office_label.df) %>%
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircleMarkers(
+    color   = ~my_pallete(office_types),
+    label   = ~map(text_label, HTML), #map over labels, make html
+    opacity = 0.4, #alpha
+    weight  = 2, #outline strength
+    radius  = 4 #size of circle
+  ) %>%
+  addLegend(
+    title    = "Office Type",
+    position = "bottomright",
+    colors   = viridis_pal(option = "D")(n_types),
+    labels   = office_types 
+  )
+```
+
+### Distribution of Bus Stop in Hennepin, MN
+```{r message = FALSE, warning = FALSE，echo=FALSE}
+#bus locations
+osm_bus_sf.df <- opq(bbox = "hennepin") %>%
+             add_osm_feature(key = "bus") %>%
+  osmdata_sf()
+
+
+#Extract the relevent sf data frame
+bus_points.df <- osm_bus_sf.df$osm_points %>% 
+  janitor::clean_names() %>%
+  filter(!is.na(metcouncil_nroutes)) %>% #only retain 'valid' tags
+  dplyr::select( bus, metcouncil_nroutes, metcouncil_routes, name, metcouncil_wkdy_trips, geometry) %>%  
+  mutate(metcouncil_nroutes = fct_inseq(metcouncil_nroutes))
+
+
+bus_points.df <- osm_bus_sf.df$osm_points %>% 
+  janitor::clean_names() %>%
+  filter(!is.na(bus)) %>% #only retain 'valid' tags
+  dplyr::select( bus, metcouncil_nroutes, metcouncil_routes, name, metcouncil_wkdy_trips, geometry) %>%
+  mutate(metcouncil_nroutes = fct_reorder(as.factor(metcouncil_nroutes),as.integer(metcouncil_nroutes))) 
+```
+
+```{r message = FALSE, warning = FALSE，echo=FALSE}
+#Extract the levels/order of bus type factor
+bus_types <- levels(bus_points.df$metcouncil_nroutes)
+n_types    <- length(bus_types)
+
+#Initialize our colour pallete (discrete in this case)
+my_pallete <- colorFactor(viridis_pal(option = "D")(n_types), domain = bus_types)
+
+#Add a text label 
+bus_label.df <- bus_points.df %>%
+  mutate(
+    text_label = str_c(
+                   name,
+                   "<br/>Number of routes: ",
+                   metcouncil_nroutes,
+                   "<br/>Routes Listing: ",
+                   metcouncil_routes,
+                   "<br/>Name: ",
+                   name,
+                   "<br/>Number of Trips in Weekday: ",
+                   metcouncil_wkdy_trips
+                 )
+  )
+
+leaflet(data = bus_label.df) %>%
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircleMarkers(
+    color   = ~my_pallete(bus_points.df$metcouncil_nroutes),
+    label   = ~map(text_label, HTML), #map over labels, make html
+    opacity = 0.4, #alpha
+    weight  = 2, #outline strength
+    radius  = 2 #size of circle
+  ) %>%
+  addLegend(
+    title    = "Accessibility by Bus",
+    position = "bottomright",
+    colors   = viridis_pal(option = "D")(n_types),
+    labels   = bus_types 
+  )
+```
+ 
